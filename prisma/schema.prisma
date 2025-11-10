@@ -1,0 +1,276 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   Int                      @id @default(autoincrement())
+  firstName            String
+  lastName             String
+  email                String                   @unique
+  username             String?                  @unique
+  password             String
+  phoneNumber          String                   @unique
+  telegramUsername     String?                  @unique
+  courseNumber         Int?
+  groupName            String?
+  image                String?
+  role                 UserRoleEnum             @default(USER)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  journals             Journal[]
+  articles             Article[]
+  articleComments      ArticleComment[]
+  references           Reference[]
+  sentChats            ArticleUserChat[]        @relation("UserFromChats")
+  receivedChats        ArticleUserChat[]        @relation("UserToChats")
+  sentChatMessages     ArticleUserChatMessage[] @relation("UserFromChatMessages")
+  receivedChatMessages ArticleUserChatMessage[] @relation("UserToChatMessages")
+  journalVersions      JournalVersion[]
+}
+
+enum UserRoleEnum {
+  ADMIN
+  USER
+  SUPERADMIN
+}
+
+model Journal {
+  id                Int              @id @default(autoincrement())
+  title             String
+  description       String
+  imageUrl          String?
+  abstract          String?
+  publishedDate     DateTime         @default(now())
+  issn              String?
+  doi               String?
+  webSiteUrl        String?
+  journalFileUrl    String?
+  isActive          Boolean          @default(true)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId            Int
+  quantity          Int?             @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  journalAuthors    JournalAuthor[]
+  journalVersions   JournalVersion[]
+
+  @@index([userId])
+}
+
+model Author {
+  id             Int             @id @default(autoincrement())
+  fullName       String
+  email          String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  journalAuthors JournalAuthor[]
+  articleAuthors ArticleAuthor[]
+}
+
+model JournalAuthor {
+  id          Int      @id @default(autoincrement())
+  journal     Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  journalId   Int
+  author      Author   @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  authorId    Int
+  authorLevel String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([journalId, authorId])
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  articles  Article[]
+}
+
+model Article {
+  id                Int                @id @default(autoincrement())
+  title             String
+  issn              String?
+  description       String?
+  abstract          String?
+  imageUrl          String?
+  doi               String?
+  webSiteUrl        String?
+  articleFileUrl    String?
+  isActive          Boolean            @default(true)
+  submissionDate    DateTime?          @default(now())
+  acceptanceDate    DateTime?          @default(now())
+  publicationDate   DateTime?          @default(now())
+  status            ArticleStatusEnum  @default(PENDING)
+  category          Category           @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  categoryId        Int
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  userId            Int
+  articleAuthors    ArticleAuthor[]
+  articleKeywords   ArticleKeyword[]
+  articleComments   ArticleComment[]
+  reviews           ReviewArticle[]
+  referenceArticles ReferenceArticle[]
+  journalVersions   JournalVersion[]
+
+  @@index([userId, categoryId])
+}
+
+enum ArticleStatusEnum {
+  PENDING
+  ACCEPTED
+  REJECTED
+  PUBLISHED
+  ERROR
+}
+
+model ArticleAuthor {
+  id          Int      @id @default(autoincrement())
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId   Int
+  author      Author   @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  authorId    Int
+  authorLevel String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([articleId, authorId])
+}
+
+model Keyword {
+  id              Int              @id @default(autoincrement())
+  keywordText     String           @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  articleKeywords ArticleKeyword[]
+}
+
+model ArticleKeyword {
+  id        Int      @id @default(autoincrement())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId Int
+  keyword   Keyword  @relation(fields: [keywordId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  keywordId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([articleId, keywordId])
+}
+
+model ArticleComment {
+  id        Int      @id @default(autoincrement())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId    Int
+  comment   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([articleId, userId])
+}
+
+model ReviewArticle {
+  id                Int      @id @default(autoincrement())
+  article           Article  @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId         Int
+  veiewCount        Int      @default(0)
+  likeCount         Int      @default(0)
+  downLoadFileCount Int      @default(0)
+  comment           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([articleId])
+}
+
+model Reference {
+  id                Int                @id @default(autoincrement())
+  referenceText     String             @unique
+  webSiteUrl        String?
+  fileUrl           String?
+  isActive          Boolean            @default(true)
+  doi               String?
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  userId            Int
+  referenceArticles ReferenceArticle[]
+
+  @@index([userId])
+}
+
+model ReferenceArticle {
+  id          Int       @id @default(autoincrement())
+  reference   Reference @relation(fields: [referenceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  referenceId Int
+  article     Article   @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId   Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([articleId, referenceId])
+}
+
+model ArticleUserChat {
+  id                      Int                      @id @default(autoincrement())
+  from                    User                     @relation("UserFromChats", fields: [fromId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  fromId                  Int
+  to                      User                     @relation("UserToChats", fields: [toId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  toId                    Int
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  articleUserChatMessages ArticleUserChatMessage[]
+
+  @@index([fromId, toId])
+}
+
+model ArticleUserChatMessage {
+  id                Int             @id @default(autoincrement())
+  chat              ArticleUserChat @relation(fields: [articleUserChatId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleUserChatId Int
+  message           String
+  isRead            Boolean         @default(false)
+  from              User            @relation("UserFromChatMessages", fields: [fromId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  fromId            Int
+  to                User            @relation("UserToChatMessages", fields: [toId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  toId              Int
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([articleUserChatId, fromId, toId])
+}
+
+model JournalVersion {
+  id            Int      @id @default(autoincrement())
+  journal       Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  journalId     Int
+  article       Article  @relation(fields: [articleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  articleId     Int
+  pageStart     Int
+  pageEnd       Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  userId        Int
+  imageUrl      String?
+  doi           String?
+  webSiteUrl    String?
+  publishedDate DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([journalId, articleId, userId])
+}
